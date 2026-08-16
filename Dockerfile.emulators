@@ -1,0 +1,26 @@
+FROM node:24-bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openjdk-17-jre-headless \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
+
+RUN npm install -g firebase-tools
+
+USER node
+WORKDIR /app
+
+COPY --chown=node:node firebase.json storage.rules ./
+
+EXPOSE 8040 8080 9099 9199
+
+HEALTHCHECK --interval=10s --timeout=5s --start-period=40s --retries=10 \
+  CMD curl -f http://localhost:8040 || exit 1
+
+CMD ["firebase", "emulators:start", \
+     "--project=organized-local", \
+     "--only=auth,firestore,storage"]
