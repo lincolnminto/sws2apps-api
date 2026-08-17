@@ -2,12 +2,9 @@ import fetch from 'node-fetch';
 import { Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 import { CongregationsList } from '../classes/Congregations.js';
-import { ApiCongregationSearchResponse } from '../definition/congregation.js';
 import { formatError } from '../utils/format_log.js';
 import { StandardRecord } from '../definition/app.js';
 import { MailClient } from '../config/mail_config.js';
-import { formatMeetingWeekday } from '../utils/congregation_utils.js';
-import { ALL_LANGUAGES } from '../constant/langList.js';
 
 const MAIL_ENABLED = process.env.MAIL_ENABLED === 'true';
 
@@ -118,40 +115,8 @@ export const createCongregation = async (req: Request, res: Response) => {
 		return;
 	}
 
-	// is congregation authentic
+	// language header is still consumed below by the welcome-email i18n change
 	const language = (req.headers.language as string) || 'eng';
-	const code = ALL_LANGUAGES.find((record) => record.threeLettersCode === language)?.code ?? 'E';
-
-	const url = process.env.APP_CONGREGATION_API! + new URLSearchParams({ country: country_guid, language: code, name: cong_name });
-
-	const response = await fetch(url);
-	if (response.status !== 200) {
-		res.locals.type = 'warn';
-		res.locals.message = 'an error occured while verifying the congregation data';
-		res.status(response.status).json({ message: 'REQUEST_NOT_VALIDATED' });
-
-		return;
-	}
-
-	const congsList = (await response.json()) as ApiCongregationSearchResponse[];
-
-	let isValidCong = false;
-
-	if (congsList?.length > 0) {
-		const findCong = congsList.find((record) => record.congName === cong_name);
-
-		if (findCong) {
-			isValidCong = true;
-		}
-	}
-
-	if (!isValidCong) {
-		res.locals.type = 'warn';
-		res.locals.message = 'this request does not match any valid congregation';
-		res.status(400).json({ message: 'BAD_REQUEST' });
-
-		return;
-	}
 
 	// update user details
 	const user = res.locals.currentUser;
@@ -162,24 +127,16 @@ export const createCongregation = async (req: Request, res: Response) => {
 
 	await user.updateProfile(profile);
 
-	// create congregation
-	const congRequest = congsList.find((record) => record.congName === cong_name)!;
-
+	// create congregation with empty/default meeting fields — filled later in Congregation Settings (D-01)
 	const congId = await CongregationsList.create({
 		cong_name,
 		country_guid,
 		country_code,
-		cong_guid: congRequest.congGuid,
-		cong_circuit: congRequest.circuit,
-		cong_location: { address: congRequest.address, lat: congRequest.location.lat, lng: congRequest.location.lng },
-		midweek_meeting: {
-			time: congRequest.midweekMeetingTime.time.slice(0, -3),
-			weekday: formatMeetingWeekday(congRequest.midweekMeetingTime.weekday),
-		},
-		weekend_meeting: {
-			time: congRequest.weekendMeetingTime.time.slice(0, -3),
-			weekday: formatMeetingWeekday(congRequest.weekendMeetingTime.weekday),
-		},
+		cong_guid: '',
+		cong_circuit: '',
+		cong_location: { address: '', lat: 0, lng: 0 },
+		midweek_meeting: { time: '', weekday: 0 },
+		weekend_meeting: { time: '', weekday: 0 },
 	});
 
 	// add user to congregation
