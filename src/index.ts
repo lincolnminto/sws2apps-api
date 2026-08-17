@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './v3/config/load_env.js';
 import { LogLevel } from '@logtail/types';
 
 import app from './app.js';
