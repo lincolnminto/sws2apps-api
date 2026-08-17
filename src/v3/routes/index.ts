@@ -12,10 +12,15 @@ import pocketRoute from './pockets.js';
 import adminRoute from './admin.js';
 
 import { appVersionChecker } from '../middleware/app_version_checker.js';
+import { firebaseSessionCookie } from '../middleware/firebase_session_cookie.js';
 
 const router = express.Router();
 
 router.use(cookieParser(process.env.SEC_ENCRYPT_KEY || 'DON’T_FORGET_TO_SET_KEY_IN_PROD'));
+
+// Behind Firebase Hosting only a `__session` cookie survives the rewrite to
+// Cloud Run; bridge it to the app's internal `visitorid` cookie name.
+router.use(firebaseSessionCookie());
 
 router.use('/public', publicRoute);
 
