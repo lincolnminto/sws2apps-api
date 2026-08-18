@@ -1,8 +1,0 @@
-'pull_request_title': 'chore(locales): updated translation from Crowdin'
-'pull_request_labels': ['crowdin']
-
-files:
-  - source: /locales/en/*.json
-    ignore:
-      - /locales/en/cpe.json
-    translation: /locales/%locale%/%original_file_name%
