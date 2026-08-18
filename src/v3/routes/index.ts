@@ -10,6 +10,7 @@ import mfaRoute from './mfa.js';
 import publicRoute from './public.js';
 import pocketRoute from './pockets.js';
 import adminRoute from './admin.js';
+import inviteRoute from './invite.js';
 
 import { appVersionChecker } from '../middleware/app_version_checker.js';
 import { firebaseSessionCookie } from '../middleware/firebase_session_cookie.js';
@@ -23,6 +24,7 @@ router.use(cookieParser(process.env.SEC_ENCRYPT_KEY || 'DON’T_FORGET_TO_SET_KE
 router.use(firebaseSessionCookie());
 
 router.use('/public', publicRoute);
+router.use('/invites', inviteRoute);
 
 router.use(appVersionChecker());
 

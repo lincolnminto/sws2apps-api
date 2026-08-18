@@ -1,6 +1,6 @@
 import express from 'express';
 import { body, header } from 'express-validator';
-import { createSignInLink, loginUser, verifyEmailToken, verifyPasswordlessInfo } from '../controllers/auth_controller.js';
+import { createSignInLink, loginUser, verifyEmailToken, verifyPasswordlessInfo, adminEmailPasswordSignin } from '../controllers/auth_controller.js';
 import { authBearerCheck } from '../services/validator/auth.js';
 
 const router = express.Router();
@@ -20,6 +20,16 @@ router.post(
 	body('email').isEmail(),
 	body('token').isNumeric().isLength({ min: 6, max: 6 }),
 	verifyEmailToken
+);
+
+router.post(
+	'/admin-email-password-signin',
+	[
+		body('email').isEmail().normalizeEmail(),
+		body('password').isString().isLength({ min: 8 }),
+		header('Authorization').exists().notEmpty().isString().custom(authBearerCheck),
+	],
+	adminEmailPasswordSignin
 );
 
 export default router;

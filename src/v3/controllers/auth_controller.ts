@@ -456,3 +456,162 @@ export const verifyEmailToken = async (req: Request, res: Response) => {
 	res.cookie('visitorid', visitorid, cookieOptions(req));
 	res.status(200).json(userInfo);
 };
+
+export const adminEmailPasswordSignin = async (req: Request, res: Response) => {
+	const userIP = req.clientIp!;
+	const isDev = process.env.NODE_ENV === 'development';
+
+	// validate through express middleware
+	const errors = validationResult(req);
+	if (!errors.isEmpty()) {
+		const msg = formatError(errors);
+
+		res.locals.type = 'warn';
+		res.locals.message = `invalid input: ${msg}`;
+
+		res.status(400).json({ message: 'error_api_bad-request' });
+
+		return;
+	}
+
+	// decode authorization
+	const idToken = req.headers.authorization!.split('Bearer ')[1];
+	const uid = await decodeUserIdToken(idToken);
+
+	if (!uid) {
+		res.locals.type = 'warn';
+		res.locals.message = 'the idToken received is invalid';
+		res.status(404).json({ message: 'error_auth_invalid-token' });
+		return;
+	}
+
+	const { getAuth } = await import('firebase-admin/auth');
+	const userRecord = await getAuth().getUser(uid);
+	const email = userRecord.email;
+
+	if (!email) {
+		res.locals.type = 'warn';
+		res.locals.message = 'user email not found';
+		res.status(404).json({ message: 'error_auth_invalid-token' });
+		return;
+	}
+
+	// Check if user is admin
+	const { isAdminEmail } = await import('../services/firebase/admins.js');
+	const isAdmin = await isAdminEmail(email);
+
+	if (!isAdmin) {
+		res.locals.type = 'warn';
+		res.locals.message = 'user is not an administrator';
+		res.status(403).json({ message: 'UNAUTHORIZED_ACCESS' });
+		return;
+	}
+
+	const visitorid: string = req.signedCookies.visitorid || crypto.randomUUID();
+	let authUser = UsersList.findByAuthUid(uid);
+	let newSessions: UserSession[] = [];
+
+	if (authUser) {
+		newSessions = authUser.sessions?.filter((record) => record.visitorid !== visitorid) || [];
+	}
+
+	if (!authUser) {
+		const displayName = userRecord.displayName || userRecord.providerData[0]?.displayName;
+		let firstname = '';
+		let lastname = '';
+
+		if (displayName && displayName.length > 0) {
+			const names = displayName.split(' ');
+			lastname = names.pop()!;
+			firstname = names.join(' ');
+		}
+
+		authUser = await UsersList.create({ auth_uid: uid, firstname, lastname, email });
+	}
+
+	const newSession: UserSession = {
+		mfaVerified: false,
+		last_seen: new Date().toISOString(),
+		visitorid: visitorid,
+		visitor_details: await retrieveVisitorDetails(userIP, req),
+		identifier: crypto.randomUUID(),
+	};
+
+	newSessions.push(newSession);
+
+	await authUser.updateSessions(newSessions);
+
+	if (authUser.profile.mfa_enabled) {
+		res.locals.type = 'info';
+		res.locals.message = 'user required to verify mfa';
+
+		res.cookie('visitorid', visitorid, cookieOptions(req));
+
+		if (isDev) {
+			const { generateTokenDev } = await import('../dev/setup.js');
+			const tokenDev = generateTokenDev(authUser.email!, authUser.profile.secret!);
+			console.log('Use this code to login:', tokenDev);
+
+			res.status(200).json({ message: 'MFA_VERIFY', code: tokenDev });
+		} else {
+			res.status(200).json({ message: 'MFA_VERIFY' });
+		}
+
+		return;
+	}
+
+	const userInfo: UserAuthResponse = {
+		message: 'TOKEN_VALID',
+		id: authUser.id,
+		app_settings: {
+			user_settings: {
+				firstname: authUser.profile.firstname,
+				lastname: authUser.profile.lastname,
+				role: authUser.profile.role,
+				mfa: 'not_enabled',
+			},
+		},
+	};
+
+	if (authUser.profile.congregation?.id) {
+		const userCong = CongregationsList.findById(authUser.profile.congregation.id);
+
+		if (userCong) {
+			const userRole = authUser.profile.congregation.cong_role;
+			const { ROLE_MASTER_KEY } = await import('../constant/base.js');
+			const masterKeyNeeded = userRole.some((role) => ROLE_MASTER_KEY.includes(role));
+
+			userInfo.app_settings.user_settings.user_local_uid = authUser.profile.congregation.user_local_uid;
+			userInfo.app_settings.user_settings.user_members_delegate = authUser.profile.congregation.user_members_delegate;
+			userInfo.app_settings.user_settings.cong_role = authUser.profile.congregation.cong_role;
+
+			const midweek = userCong.settings.midweek_meeting.map((record) => {
+				return { type: record.type, time: record.time, weekday: record.weekday };
+			});
+
+			const weekend = userCong.settings.weekend_meeting.map((record) => {
+				return { type: record.type, time: record.time, weekday: record.weekday };
+			});
+
+			userInfo.app_settings.cong_settings = {
+				id: authUser.profile.congregation.id,
+				cong_circuit: userCong.settings.cong_circuit,
+				cong_name: userCong.settings.cong_name,
+				cong_prefix: userCong.settings.cong_prefix,
+				cong_number: userCong.settings.cong_number,
+				country_code: userCong.settings.country_code,
+				cong_access_code: userCong.settings.cong_access_code,
+				cong_master_key: masterKeyNeeded ? userCong.settings.cong_master_key : undefined,
+				cong_location: userCong.settings.cong_location,
+				midweek_meeting: midweek,
+				weekend_meeting: weekend,
+			};
+		}
+	}
+
+	res.locals.type = 'info';
+	res.locals.message = 'admin successfully logged in';
+
+	res.cookie('visitorid', visitorid, cookieOptions(req));
+	res.status(200).json(userInfo);
+};

@@ -7,6 +7,7 @@ import { logger } from './v3/services/logger/logger.js';
 import { ServerTempVariableType } from './v3/definition/server.js';
 import { BackupForStorage } from './v3/definition/congregation.js';
 import { UsersList } from './v3/classes/Users.js';
+import { InvitesList } from './v3/classes/Invites.js';
 import { CongregationsList } from './v3/classes/Congregations.js';
 import { Flags } from './v3/classes/Flags.js';
 import { Installation } from './v3/classes/Installation.js';
@@ -37,6 +38,7 @@ app.listen(PORT, async () => {
 	logger(LogLevel.Info, `loading firebase data`, { service: 'firebase' });
 
 	await UsersList.load();
+	await InvitesList.load();
 	await CongregationsList.load();
 	await CongregationsList.cleanupTasks();
 	await Flags.load();
