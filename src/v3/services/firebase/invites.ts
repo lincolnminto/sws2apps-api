@@ -77,7 +77,12 @@ export async function findInviteById(id: string): Promise<InviteType | null> {
 }
 
 export async function acceptInviteTransactional(id: string, auth_uid: string): Promise<InviteType> {
-  const inviteRef = db.collection(INVITES_COLLECTION).doc(id);
+	return completeInviteProvisioning(id, auth_uid);
+}
+
+export async function beginInviteProvisioning(id: string, auth_uid: string): Promise<InviteType> {
+	const inviteRef = db.collection(INVITES_COLLECTION).doc(id);
+	const provisioning_user_id = crypto.randomUUID().toUpperCase();
 
   const result = await db.runTransaction(async (transaction) => {
     const inviteDoc = await transaction.get(inviteRef);
@@ -88,8 +93,24 @@ export async function acceptInviteTransactional(id: string, auth_uid: string): P
 
     const invite = inviteDoc.data() as InviteType;
 
-    if (invite.status !== 'pending') {
-      throw new InviteUnavailableError(`Invite is ${invite.status}`);
+		if (invite.status === 'accepted') {
+			if (invite.accepted_by !== auth_uid) {
+				throw new InviteUnavailableError(`Invite is ${invite.status}`);
+			}
+
+			return invite;
+		}
+
+		if (invite.status === 'provisioning') {
+			if (invite.accepted_by !== auth_uid) {
+				throw new InviteUnavailableError(`Invite is ${invite.status}`);
+			}
+
+			return invite;
+		}
+
+		if (invite.status !== 'pending') {
+			throw new InviteUnavailableError(`Invite is ${invite.status}`);
     }
 
     const now = Date.now();
@@ -97,18 +118,51 @@ export async function acceptInviteTransactional(id: string, auth_uid: string): P
       throw new InviteUnavailableError('Invite has expired');
     }
 
-    const accepted_at = toISOString(now);
+		transaction.update(inviteRef, {
+			status: 'provisioning',
+			accepted_by: auth_uid,
+			provisioning_user_id,
+		});
 
-    transaction.update(inviteRef, {
-      status: 'accepted',
-      accepted_at,
-      accepted_by: auth_uid,
-    });
-
-    return { ...invite, status: 'accepted' as InviteStatus, accepted_at, accepted_by: auth_uid };
-  });
+		return {
+			...invite,
+			status: 'provisioning' as InviteStatus,
+			accepted_by: auth_uid,
+			provisioning_user_id,
+		};
+	});
 
   return result;
+}
+
+export async function completeInviteProvisioning(id: string, auth_uid: string): Promise<InviteType> {
+	const inviteRef = db.collection(INVITES_COLLECTION).doc(id);
+
+	return db.runTransaction(async (transaction) => {
+		const inviteDoc = await transaction.get(inviteRef);
+
+		if (!inviteDoc.exists) {
+			throw new InviteUnavailableError('Invite not found');
+		}
+
+		const invite = inviteDoc.data() as InviteType;
+		if (invite.accepted_by !== auth_uid) {
+			throw new InviteUnavailableError(`Invite is ${invite.status}`);
+		}
+
+		if (invite.status === 'accepted') {
+			return invite;
+		}
+
+		if (invite.status !== 'provisioning') {
+			throw new InviteUnavailableError(`Invite is ${invite.status}`);
+		}
+
+		const accepted_at = toISOString(Date.now());
+		transaction.update(inviteRef, { status: 'accepted', accepted_at });
+
+		return { ...invite, status: 'accepted' as InviteStatus, accepted_at };
+	});
 }
 
 export async function revokeInvite(id: string, admin_uid: string): Promise<void> {

@@ -5,7 +5,8 @@ import { MailClient } from '../config/mail_config.js';
 import { InvitesList } from '../classes/Invites.js';
 import { UsersList } from '../classes/Users.js';
 import {
-  acceptInviteTransactional,
+  beginInviteProvisioning,
+  completeInviteProvisioning,
   createInvite as createFirestoreInvite,
   listInvites as listFirestoreInvites,
   revokeInvite as revokeFirestoreInvite,
@@ -14,6 +15,7 @@ import { decodeUserIdToken } from '../services/firebase/users.js';
 import { InviteUnavailableError } from '../definition/invite.js';
 import { AppRoleType } from '../definition/app.js';
 import { validateInviteToken } from '../services/validator/invite.js';
+import { CongregationsList } from '../classes/Congregations.js';
 
 const invalidToken = { message: 'error_auth_invalid-token' };
 
@@ -121,7 +123,6 @@ export const acceptInvite = async (req: Request, res: Response) => {
       firstname: string;
       lastname: string;
     };
-    const invite = await validateInviteToken(token);
     const idToken = req.headers.authorization?.split('Bearer ')[1];
     const uid = idToken ? await decodeUserIdToken(idToken) : undefined;
 
@@ -130,14 +131,47 @@ export const acceptInvite = async (req: Request, res: Response) => {
       return;
     }
 
+    const invite = await validateInviteToken(token, uid);
+
     const authUser = await getAuth().getUser(uid);
     if (authUser.email?.toLowerCase() !== invite.email.toLowerCase()) {
       res.status(403).json({ message: 'UNAUTHORIZED_ACCESS' });
       return;
     }
 
-    await acceptInviteTransactional(invite.id, uid);
-    const user = await UsersList.create({ auth_uid: uid, firstname, lastname, email: invite.email });
+    if (!CongregationsList.findById(invite.congregation_id)) {
+      throw new Error('Invite congregation is no longer available');
+    }
+
+    const claimedInvite = await beginInviteProvisioning(invite.id, uid);
+    let user = UsersList.findByAuthUid(uid);
+
+    if (claimedInvite.status === 'accepted') {
+      if (!user || user.profile.congregation?.id !== invite.congregation_id) {
+        throw new Error('Accepted invite is missing its provisioned profile');
+      }
+
+      res.status(200).json({ user_id: user.id, congregation_id: invite.congregation_id });
+      return;
+    }
+
+    if (user && (user.id !== claimedInvite.provisioning_user_id || user.profile.invite_id !== invite.id)) {
+      res.status(409).json({ message: 'INVITE_ACCOUNT_CONFLICT' });
+      return;
+    }
+
+    if (!claimedInvite.provisioning_user_id) {
+      throw new Error('Provisioning invite is missing its user identifier');
+    }
+
+    user = user || await UsersList.create({
+      id: claimedInvite.provisioning_user_id,
+      auth_uid: uid,
+      firstname,
+      lastname,
+      email: invite.email,
+      invite_id: invite.id,
+    });
 
     await user.assignCongregation({
       congId: invite.congregation_id,
@@ -145,6 +179,7 @@ export const acceptInvite = async (req: Request, res: Response) => {
       firstname,
       lastname,
     });
+    await completeInviteProvisioning(invite.id, uid);
     await InvitesList.load();
     res.status(200).json({ user_id: user.id, congregation_id: invite.congregation_id });
   } catch (error) {

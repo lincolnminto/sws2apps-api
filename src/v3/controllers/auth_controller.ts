@@ -1,5 +1,4 @@
 import { Request, Response } from 'express';
-import { getAuth } from 'firebase-admin/auth';
 import { validationResult } from 'express-validator';
 import { generateTokenDev } from '../dev/setup.js';
 import { UsersList } from '../classes/Users.js';
@@ -41,7 +40,7 @@ export const loginUser = async (req: Request, res: Response) => {
 	}
 
 	const visitorid: string = req.signedCookies.visitorid || crypto.randomUUID();
-	let authUser = UsersList.findByAuthUid(uid);
+	const authUser = UsersList.findByAuthUid(uid);
 	let newSessions: UserSession[] = [];
 
 	if (authUser) {
@@ -49,18 +48,10 @@ export const loginUser = async (req: Request, res: Response) => {
 	}
 
 	if (!authUser) {
-		const userRecord = await getAuth().getUser(uid);
-		const displayName = userRecord.displayName || userRecord.providerData[0].displayName;
-		let firstname = '';
-		let lastname = '';
-
-		if (displayName.length > 0) {
-			const names = displayName.split(' ');
-			lastname = names.pop()!;
-			firstname = names.join(' ');
-		}
-
-		authUser = await UsersList.create({ auth_uid: uid, firstname, lastname });
+		res.locals.type = 'warn';
+		res.locals.message = 'Firebase user does not have an approved application profile';
+		res.status(403).json({ message: 'UNAUTHORIZED_ACCESS' });
+		return;
 	}
 
 	const newSession: UserSession = {

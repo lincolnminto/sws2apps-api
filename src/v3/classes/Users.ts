@@ -20,8 +20,15 @@ class Users {
 	}
 
 	async #add(id: string) {
+		const existing = this.findById(id);
+		if (existing) return existing;
+
 		const user = new User(id);
 		await user.loadDetails();
+
+		const loadedByAnotherRequest = this.findById(id);
+		if (loadedByAnotherRequest) return loadedByAnotherRequest;
+
 		this.list.push(user);
 		this.#sort();
 
@@ -59,6 +66,11 @@ class Users {
 	}
 
 	async create(params: UserNewParams) {
+		if (params.id) {
+			const existing = this.findById(params.id);
+			if (existing) return existing;
+		}
+
 		const id = await createUser(params);
 
 		const user = await this.#add(id);

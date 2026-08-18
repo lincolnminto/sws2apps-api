@@ -4,10 +4,12 @@ import { CircuitRecordType } from './congregation.js';
 export type UserGlobalRoleType = 'vip' | 'pocket' | 'admin';
 
 export type UserNewParams = {
+	id?: string;
 	auth_uid: string;
 	firstname: string;
 	lastname: string;
 	email?: string;
+	invite_id?: string;
 };
 
 export type PocketNewParams = {
@@ -63,6 +65,7 @@ export type UserSettings = {
 export type UserProfile = {
 	createdAt?: string;
 	auth_uid?: string;
+	invite_id?: string;
 	firstname: { value: string; updatedAt: string };
 	lastname: { value: string; updatedAt: string };
 	role: UserGlobalRoleType;

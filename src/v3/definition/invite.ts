@@ -1,6 +1,6 @@
 import { AppRoleType } from './app.js';
 
-export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+export type InviteStatus = 'pending' | 'provisioning' | 'accepted' | 'expired' | 'revoked';
 
 export interface InviteType {
   id: string;
@@ -8,12 +8,13 @@ export interface InviteType {
   congregation_id: string;
   role: AppRoleType[];
   token_hash: string;
-  status: 'pending'|'accepted'|'expired'|'revoked';
+  status: InviteStatus;
   expires_at: string; // ISO-8601 string
   created_at: string; // ISO-8601 string
   created_by: string; // admin uid
   accepted_at?: string | null;
   accepted_by?: string | null;
+  provisioning_user_id?: string | null;
   revoked_at?: string | null;
 }
 

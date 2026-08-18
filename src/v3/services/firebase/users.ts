@@ -252,13 +252,14 @@ export const createUser = async (params: UserNewParams) => {
 		await getAuth().updateUser(params.auth_uid, { email: params.email });
 	}
 
-	const id = crypto.randomUUID().toUpperCase();
+	const id = params.id || crypto.randomUUID().toUpperCase();
 
 	const profile: UserProfile = {
 		firstname: { value: params.firstname, updatedAt: new Date().toISOString() },
 		lastname: { value: params.lastname, updatedAt: new Date().toISOString() },
 		role: 'vip',
 		auth_uid: params.auth_uid,
+		invite_id: params.invite_id,
 		createdAt: new Date().toISOString(),
 	};
 
