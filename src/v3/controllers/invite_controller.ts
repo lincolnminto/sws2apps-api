@@ -51,7 +51,7 @@ export const createInvite = async (req: Request, res: Response) => {
       inviteDesc: translate('tr_inviteDesc', 'An administrator has invited you to join their congregation on Organized.'),
       inviteButton: translate('tr_inviteButton', 'Accept invitation'),
       inviteExpiry: translate('tr_inviteExpiry', 'This invitation expires in 24 hours.'),
-      link: `${appHost}/?invite=${token}`,
+      link: `${appHost.replace(/\/$/, '')}/#/?invite=${token}`,
       copyright: new Date().getFullYear(),
     },
   };
