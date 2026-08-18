@@ -98,7 +98,9 @@ export const revokeInvite = async (req: Request, res: Response) => {
 
 export const getInviteInfo = async (req: Request, res: Response) => {
   try {
-    const invite = await validateInviteToken(String(req.query.token || ''));
+    const idToken = req.headers.authorization?.split('Bearer ')[1];
+    const uid = idToken ? await decodeUserIdToken(idToken) : undefined;
+    const invite = await validateInviteToken(String(req.query.token || ''), uid);
     res.status(200).json({
       email: invite.email,
       congregation_id: invite.congregation_id,
