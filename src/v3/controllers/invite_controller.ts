@@ -3,14 +3,16 @@ import { validationResult } from 'express-validator';
 import { getAuth } from 'firebase-admin/auth';
 import { MailClient } from '../config/mail_config.js';
 import { InvitesList } from '../classes/Invites.js';
+import { UsersList } from '../classes/Users.js';
 import {
   acceptInviteTransactional,
   createInvite as createFirestoreInvite,
   listInvites as listFirestoreInvites,
   revokeInvite as revokeFirestoreInvite,
 } from '../services/firebase/invites.js';
-import { createUser, decodeUserIdToken } from '../services/firebase/users.js';
+import { decodeUserIdToken } from '../services/firebase/users.js';
 import { InviteUnavailableError } from '../definition/invite.js';
+import { AppRoleType } from '../definition/app.js';
 import { validateInviteToken } from '../services/validator/invite.js';
 
 const invalidToken = { message: 'error_auth_invalid-token' };
@@ -29,7 +31,7 @@ export const createInvite = async (req: Request, res: Response) => {
   const { email, congregation_id, role } = req.body as {
     email: string;
     congregation_id: string;
-    role: string[];
+    role: AppRoleType[];
   };
   const created_by = res.locals.inviteAdminUid as string;
   const { token } = await createFirestoreInvite({ email, congregation_id, role, created_by });
@@ -135,9 +137,16 @@ export const acceptInvite = async (req: Request, res: Response) => {
     }
 
     await acceptInviteTransactional(invite.id, uid);
-    const user_id = await createUser({ auth_uid: uid, firstname, lastname, email: invite.email });
+    const user = await UsersList.create({ auth_uid: uid, firstname, lastname, email: invite.email });
+
+    await user.assignCongregation({
+      congId: invite.congregation_id,
+      role: invite.role,
+      firstname,
+      lastname,
+    });
     await InvitesList.load();
-    res.status(200).json({ user_id, congregation_id: invite.congregation_id });
+    res.status(200).json({ user_id: user.id, congregation_id: invite.congregation_id });
   } catch (error) {
     if (error instanceof InviteUnavailableError) {
       res.status(410).json(invalidToken);

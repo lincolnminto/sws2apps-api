@@ -1,4 +1,5 @@
 import { InviteType } from '../definition/invite.js';
+import { AppRoleType } from '../definition/app.js';
 import { createInvite, findInviteByToken, listInvites, revokeInvite, acceptInviteTransactional } from '../services/firebase/invites.js';
 
 class Invites {
@@ -35,7 +36,7 @@ class Invites {
     return findInviteByToken(token);
   }
 
-  async create(input: { email: string; congregation_id: string; role: string[]; created_by: string }) {
+  async create(input: { email: string; congregation_id: string; role: AppRoleType[]; created_by: string }) {
     const { invite } = await createInvite(input);
     return this.#add(invite);
   }

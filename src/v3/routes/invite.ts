@@ -12,6 +12,24 @@ import { isAdminEmail } from '../services/firebase/admins.js';
 import { decodeUserIdToken } from '../services/firebase/users.js';
 import { authBearerCheck } from '../services/validator/auth.js';
 
+const inviteRoleOptions = [
+  'admin',
+  'coordinator',
+  'secretary',
+  'service_overseer',
+  'field_service_group_overseer',
+  'midweek_schedule',
+  'weekend_schedule',
+  'public_talk_schedule',
+  'attendance_tracking',
+  'publisher',
+  'view_schedules',
+  'elder',
+  'group_overseers',
+  'language_group_overseers',
+  'duties_schedule',
+];
+
 const router = express.Router();
 
 const inviteAdminChecker = async (req: Request, res: Response, next: NextFunction) => {
@@ -51,7 +69,7 @@ router.post(
   [
     body('email').isEmail().normalizeEmail(),
     body('congregation_id').isString().notEmpty(),
-    body('role').isArray({ min: 1 }),
+    body('role').isArray({ min: 1 }).custom((roles: unknown[]) => roles.every((role) => typeof role === 'string' && inviteRoleOptions.includes(role))),
   ],
   createInvite,
 );

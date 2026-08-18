@@ -1,6 +1,7 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import crypto from 'crypto';
 import { InviteType, InviteStatus, InviteUnavailableError } from '../../definition/invite.js';
+import { AppRoleType } from '../../definition/app.js';
 
 const db = getFirestore();
 const INVITES_COLLECTION = 'invites';
@@ -24,7 +25,7 @@ function toISOString(ts: number): string {
 export async function createInvite(input: {
   email: string;
   congregation_id: string;
-  role: string[];
+  role: AppRoleType[];
   created_by: string;
 }): Promise<{ invite: InviteType; token: string }> {
   const token = generateToken();
@@ -35,7 +36,7 @@ export async function createInvite(input: {
   const inviteData: Omit<InviteType, 'id'> = {
     email: input.email.toLowerCase(),
     congregation_id: input.congregation_id,
-    role: input.role as InviteType['role'],
+    role: input.role,
     token_hash,
     status: 'pending',
     expires_at: toISOString(expires_at),

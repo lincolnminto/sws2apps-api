@@ -1,12 +1,12 @@
-export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
+import { AppRoleType } from './app.js';
 
-export type InviteRole = 'vip' | 'pocket';
+export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 
 export interface InviteType {
   id: string;
   email: string;
   congregation_id: string;
-  role: InviteRole[];
+  role: AppRoleType[];
   token_hash: string;
   status: 'pending'|'accepted'|'expired'|'revoked';
   expires_at: string; // ISO-8601 string
