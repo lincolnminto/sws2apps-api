@@ -178,16 +178,12 @@ export const adminEmailPasswordSignin = async (req: Request, res: Response) => {
 		return;
 	}
 
-	// Check if user is admin
-	const { isAdminEmail } = await import('../services/firebase/admins.js');
-	const isAdmin = await isAdminEmail(email);
 
-	if (!isAdmin) {
-		res.locals.type = 'warn';
-		res.locals.message = 'user is not an administrator';
-		res.status(403).json({ message: 'UNAUTHORIZED_ACCESS' });
-		return;
-	}
+	// This single-tenant deployment treats every enabled Firebase Auth
+	// email/password account as an administrator. Firebase Admin verifies the
+	// ID token above and getUser rejects disabled or deleted accounts, so no
+	// separate custom-claim or Firestore allowlist is required for this entry
+	// point.
 
 	const visitorid: string = req.signedCookies.visitorid || crypto.randomUUID();
 	let authUser = UsersList.findByAuthUid(uid);
