@@ -22,7 +22,7 @@ router.put(
 	'/',
 	body('country_code').isString().notEmpty(),
 	body('country_guid').isString().notEmpty(),
-	body('cong_name').isString().notEmpty(),
+	body('cong_name').isString().trim().notEmpty(),
 	body('firstname').isString().notEmpty(),
 	body('lastname').isString(),
 	createCongregation

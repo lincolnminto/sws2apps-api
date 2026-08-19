@@ -8,6 +8,9 @@ import { MailClient } from '../config/mail_config.js';
 
 const MAIL_ENABLED = process.env.MAIL_ENABLED === 'true';
 
+const CREATION_COUNTRY_CODE = 'BRA';
+const CREATION_COUNTRY_GUID = 'a752410b-295d-43d6-9aa0-5b3fa0ba7ec3';
+
 export const getCountries = async (req: Request, res: Response) => {
 	const errors = validationResult(req);
 
@@ -102,10 +105,22 @@ export const createCongregation = async (req: Request, res: Response) => {
 		return;
 	}
 
-	const { country_code, country_guid, cong_name, firstname, lastname } = req.body as Record<string, string>;
+	const { firstname, lastname } = req.body as Record<string, string>;
+	const cong_name = String(req.body.cong_name ?? '').trim();
+
+	if (cong_name.length === 0) {
+		res.locals.type = 'warn';
+		res.locals.message = 'invalid input: congregation name is empty';
+		res.status(400).json({ message: 'error_api_bad-request' });
+		return;
+	}
 
 	// find congregation
-	const cong = CongregationsList.findByCountryAndName(country_guid, cong_name, country_code);
+	const cong = CongregationsList.findByCountryAndName(
+		CREATION_COUNTRY_GUID,
+		cong_name,
+		CREATION_COUNTRY_CODE
+	);
 
 	if (cong) {
 		res.locals.type = 'warn';
@@ -130,8 +145,8 @@ export const createCongregation = async (req: Request, res: Response) => {
 	// create congregation with empty/default meeting fields — filled later in Congregation Settings (D-01)
 	const congId = await CongregationsList.create({
 		cong_name,
-		country_guid,
-		country_code,
+		country_guid: CREATION_COUNTRY_GUID,
+		country_code: CREATION_COUNTRY_CODE,
 		cong_guid: '',
 		cong_circuit: '',
 		cong_location: { address: '', lat: 0, lng: 0 },
