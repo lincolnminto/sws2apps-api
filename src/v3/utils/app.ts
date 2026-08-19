@@ -3,7 +3,7 @@ import { API_VAR } from '../../index.js';
 
 const isLocalRequest = (req: Request) => {
 	const host = req.get('host');
-	return host?.includes('localhost');
+	return host?.includes('localhost') || host?.includes('127.0.0.1');
 };
 
 export const cookieOptions = (req: Request): CookieOptions => {
